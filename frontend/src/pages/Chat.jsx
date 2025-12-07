@@ -1,25 +1,24 @@
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import api from "../api/client";
-import { useAuth } from "../context/AuthContext";
-import { useSocket } from "../hooks/useSocket";
-import ConversationList from "../components/ConversationList";
-import MessageList from "../components/MessageList";
-import MessageInput from "../components/MessageInput";
-import FriendsList from "../components/FriendRequests";
-import FriendRequestsList from "../components/FriendRequestsList";
-import ThemeSelector from "../components/ThemeSelector";
-import IncomingCall from "../components/IncomingCall";
-import ActiveCall from "../components/ActiveCall";
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useCall } from '../context/CallContext';
+import { useTheme } from '../context/ThemeContext';
+import { useSocket } from '../hooks/useSocket';
+import ConversationList from '../components/ConversationList';
+import MessageList from '../components/MessageList';
+import MessageInput from '../components/MessageInput';
+import IncomingCall from '../components/IncomingCall';
+import ActiveCall from '../components/ActiveCall';
+import ThemeSelector from '../components/ThemeSelector';
+import api from '../api/client';
 import CallButton from "../components/CallButton";
-import { useTheme } from "../context/ThemeContext";
-import { useCall } from "../context/CallContext";
 
 const Chat = () => {
   const { user, logout } = useAuth();
   const { theme } = useTheme();
   const { initiateCall } = useCall();
   const socketRef = useSocket(true);
+  const [showCallOptions, setShowCallOptions] = useState(false);
 
   const [conversations, setConversations] = useState([]);
   const [activeConvo, setActiveConvo] = useState(null);
@@ -35,6 +34,38 @@ const Chat = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("chats"); // "chats", "friends", "requests"
   const [sendingRequest, setSendingRequest] = useState(null);
+
+  const handleAudioCall = async () => {
+    if (!activeConvo) return;
+    const otherUser = activeConvo.participants.find(p => p._id !== user._id);
+    console.log('Audio call - otherUser:', otherUser);
+    console.log('Audio call - otherUser._id:', otherUser?._id);
+    console.log('Audio call - current user._id:', user._id);
+    if (otherUser) {
+      try {
+        await initiateCall(otherUser._id, 'audio');
+        setShowCallOptions(false);
+      } catch (error) {
+        console.error('Failed to initiate audio call:', error);
+      }
+    }
+  };
+
+  const handleVideoCall = async () => {
+    if (!activeConvo) return;
+    const otherUser = activeConvo.participants.find(p => p._id !== user._id);
+    console.log('Video call - otherUser:', otherUser);
+    console.log('Video call - otherUser._id:', otherUser?._id);
+    console.log('Video call - current user._id:', user._id);
+    if (otherUser) {
+      try {
+        await initiateCall(otherUser._id, 'video');
+        setShowCallOptions(false);
+      } catch (error) {
+        console.error('Failed to initiate video call:', error);
+      }
+    }
+  };
 
   const loadConversations = async () => {
     const res = await api.get("/conversations");
@@ -511,87 +542,132 @@ const Chat = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                 </button>
+                
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      const otherUser = activeConvo.participants.find(p => !p.isSelf);
-                      if (otherUser) {
-                        startCall(otherUser._id);
-                      }
-                    }}
-                    className={`p-2 rounded ${theme.colors.surfaceHover}`}
-                    title="Start Audio Call"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                    </svg>
-                  </button>
-                  <button
-                  onClick={() => {
-                    const otherUser = activeConvo.participants.find(p => !p.isSelf);
-                    if (otherUser) {
-                      window.open(`/profile/${otherUser._id}`, '_blank');
-                    }
-                  }}
-                  className="flex items-center gap-2 hover:bg-slate-800 rounded px-2 py-1 transition-colors"
-                >
+                  {/* Call Options Dropdown */}
                   <div className="relative">
-                    <img
-                      src={activeConvo.participants.find(p => !p.isSelf)?.avatarUrl || `https://ui-avatars.com/api/?name=${activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}&background=6366f1&color=fff`}
-                      alt={activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                    {activeConvo.participants.find(p => !p.isSelf)?.online && (
-                      <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border border-slate-800"></div>
+                    <button
+                      onClick={() => setShowCallOptions(!showCallOptions)}
+                      className={`p-2 rounded ${theme.colors.surfaceHover}`}
+                      title="Start Call"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                      </svg>
+                    </button>
+
+                    {showCallOptions && (
+                      <div className={`absolute top-full mt-2 right-0 ${theme.colors.surface} border ${theme.colors.border} rounded-lg shadow-lg p-2 z-50`}>
+                        <button
+                          onClick={handleAudioCall}
+                          className={`flex items-center gap-2 px-3 py-2 rounded hover:${theme.colors.buttonSecondary} w-full text-left ${theme.colors.text}`}
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                          </svg>
+                          Audio Call
+                        </button>
+                        <button
+                          onClick={handleVideoCall}
+                          className={`flex items-center gap-2 px-3 py-2 rounded hover:${theme.colors.buttonSecondary} w-full text-left ${theme.colors.text}`}
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                          </svg>
+                          Video Call
+                        </button>
+                      </div>
                     )}
                   </div>
-                  <span className="font-medium">
-                    {activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}
-                  </span>
-                </button>
+
+                  <button
+                    onClick={() => {
+                      const otherUser = activeConvo.participants.find(p => p._id !== user._id);
+                      if (otherUser) {
+                        window.open(`/profile/${otherUser._id}`, '_blank');
+                      }
+                    }}
+                    className="flex items-center gap-2 hover:bg-slate-800 rounded px-2 py-1 transition-colors"
+                  >
+                    <div className="relative">
+                      <img
+                        src={activeConvo.participants.find(p => p._id !== user._id)?.avatarUrl || `https://ui-avatars.com/api/?name=${activeConvo.participants.find(p => p._id !== user._id)?.displayName || activeConvo.participants.find(p => p._id !== user._id)?.username}&background=6366f1&color=fff`}
+                        alt={activeConvo.participants.find(p => p._id !== user._id)?.displayName || activeConvo.participants.find(p => p._id !== user._id)?.username}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                      {activeConvo.participants.find(p => p._id !== user._id)?.online && (
+                        <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border border-slate-800"></div>
+                      )}
+                    </div>
+                    <span className="font-medium">
+                      {activeConvo.participants.find(p => p._id !== user._id)?.displayName || activeConvo.participants.find(p => p._id !== user._id)?.username}
+                    </span>
+                  </button>
                 </div>
               </div>
               
               {/* Desktop Chat Header */}
               <div className="hidden md:flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-900">
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      const otherUser = activeConvo.participants.find(p => !p.isSelf);
-                      if (otherUser) {
-                        startCall(otherUser._id);
-                      }
-                    }}
-                    className={`p-2 rounded ${theme.colors.surfaceHover}`}
-                    title="Start Audio Call"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                    </svg>
-                  </button>
-                  <button
-                  onClick={() => {
-                    const otherUser = activeConvo.participants.find(p => !p.isSelf);
-                    if (otherUser) {
-                      window.open(`/profile/${otherUser._id}`, '_blank');
-                    }
-                  }}
-                  className="flex items-center gap-2 hover:bg-slate-800 rounded px-2 py-1 transition-colors"
-                >
+                  {/* Call Options Dropdown */}
                   <div className="relative">
-                    <img
-                      src={activeConvo.participants.find(p => !p.isSelf)?.avatarUrl || `https://ui-avatars.com/api/?name=${activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}&background=6366f1&color=fff`}
-                      alt={activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                    {activeConvo.participants.find(p => !p.isSelf)?.online && (
-                      <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border border-slate-800"></div>
+                    <button
+                      onClick={() => setShowCallOptions(!showCallOptions)}
+                      className={`p-2 rounded ${theme.colors.surfaceHover}`}
+                      title="Start Call"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                      </svg>
+                    </button>
+
+                    {showCallOptions && (
+                      <div className={`absolute top-full mt-2 left-0 ${theme.colors.surface} border ${theme.colors.border} rounded-lg shadow-lg p-2 z-50`}>
+                        <button
+                          onClick={handleAudioCall}
+                          className={`flex items-center gap-2 px-3 py-2 rounded hover:${theme.colors.buttonSecondary} w-full text-left ${theme.colors.text}`}
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                          </svg>
+                          Audio Call
+                        </button>
+                        <button
+                          onClick={handleVideoCall}
+                          className={`flex items-center gap-2 px-3 py-2 rounded hover:${theme.colors.buttonSecondary} w-full text-left ${theme.colors.text}`}
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                          </svg>
+                          Video Call
+                        </button>
+                      </div>
                     )}
                   </div>
-                  <span className="font-medium">
-                    {activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}
-                  </span>
-                </button>
+
+                  <button
+                    onClick={() => {
+                      const otherUser = activeConvo.participants.find(p => p._id !== user._id);
+                      if (otherUser) {
+                        window.open(`/profile/${otherUser._id}`, '_blank');
+                      }
+                    }}
+                    className="flex items-center gap-2 hover:bg-slate-800 rounded px-2 py-1 transition-colors"
+                  >
+                    <div className="relative">
+                      <img
+                        src={activeConvo.participants.find(p => p._id !== user._id)?.avatarUrl || `https://ui-avatars.com/api/?name=${activeConvo.participants.find(p => p._id !== user._id)?.displayName || activeConvo.participants.find(p => p._id !== user._id)?.username}&background=6366f1&color=fff`}
+                        alt={activeConvo.participants.find(p => p._id !== user._id)?.displayName || activeConvo.participants.find(p => p._id !== user._id)?.username}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                      {activeConvo.participants.find(p => p._id !== user._id)?.online && (
+                        <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border border-slate-800"></div>
+                      )}
+                    </div>
+                    <span className="font-medium">
+                      {activeConvo.participants.find(p => p._id !== user._id)?.displayName || activeConvo.participants.find(p => p._id !== user._id)?.username}
+                    </span>
+                  </button>
                 </div>
               </div>
               

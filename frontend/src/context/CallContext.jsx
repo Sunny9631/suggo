@@ -78,6 +78,7 @@ export const CallProvider = ({ children }) => {
 
   const initiateCall = async (receiverId, type = 'audio') => {
     try {
+      console.log('Initiating call with:', { receiverId, type });
       const response = await api.post('/calls/initiate', { receiverId, type });
       const call = response.data;
       
@@ -97,7 +98,7 @@ export const CallProvider = ({ children }) => {
       setActiveCall(call);
       
       // Caller sets up WebRTC immediately and creates offer
-      await setupWebRTC(call.roomId, receiverId);
+      await setupWebRTC(call.roomId, receiverId, call.type);
       
       return call;
     } catch (error) {
@@ -188,6 +189,19 @@ export const CallProvider = ({ children }) => {
         window.remoteAudio = null;
       }
       
+      // Clean up video element
+      if (window.remoteVideo) {
+        window.remoteVideo.pause();
+        window.remoteVideo.srcObject = null;
+        window.remoteVideo = null;
+      }
+      
+      // Clear video container
+      const videoContainer = document.getElementById('remote-video-container');
+      if (videoContainer) {
+        videoContainer.innerHTML = '';
+      }
+      
       // Close peer connection
       if (window.currentPeerConnection) {
         window.currentPeerConnection.close();
@@ -202,7 +216,7 @@ export const CallProvider = ({ children }) => {
     }
   };
 
-  const setupWebRTC = async (roomId, targetUserId) => {
+  const setupWebRTC = async (roomId, targetUserId, callType = 'audio') => {
     try {
       // Close any existing connection first
       if (window.currentPeerConnection) {
@@ -210,10 +224,10 @@ export const CallProvider = ({ children }) => {
         window.currentPeerConnection = null;
       }
 
-      // Get user media
+      // Get user media based on call type
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: true, 
-        video: false 
+        video: callType === 'video'
       });
       setLocalStream(stream);
 
@@ -249,11 +263,15 @@ export const CallProvider = ({ children }) => {
 
       // Handle remote stream
       peerConnection.ontrack = (event) => {
-        console.log('Received remote stream');
+        console.log('Received remote stream in WebRTC offer handler');
         setRemoteStream(event.streams[0]);
-        
-        // Create and properly manage audio element
         createAudioElement(event.streams[0]);
+        
+        // Create video element if this is a video call
+        // We need to determine the call type from the active call
+        if (activeCall && activeCall.type === 'video') {
+          createVideoElement(event.streams[0]);
+        }
       };
 
       // Handle connection state changes
@@ -331,6 +349,43 @@ export const CallProvider = ({ children }) => {
     playAudio();
   };
 
+  // Separate function to create and manage video element
+  const createVideoElement = (stream) => {
+    // Clean up existing video element
+    if (window.remoteVideo) {
+      window.remoteVideo.pause();
+      window.remoteVideo.srcObject = null;
+      if (window.remoteVideo.parentNode) {
+        window.remoteVideo.parentNode.removeChild(window.remoteVideo);
+      }
+    }
+
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.autoplay = true;
+    video.muted = false; // Don't mute remote video
+    video.playsInline = true;
+    video.style.width = '100%';
+    video.style.height = '100%';
+    video.style.objectFit = 'cover';
+    
+    // Find the remote video container and attach the video
+    const container = document.getElementById('remote-video-container');
+    if (container) {
+      // Clear any existing content
+      container.innerHTML = '';
+      container.appendChild(video);
+      console.log('Remote video element attached to container');
+    } else {
+      console.error('Remote video container not found');
+    }
+    
+    // Store globally
+    window.remoteVideo = video;
+    
+    console.log('Video element created and attached to container');
+  };
+
   const toggleMute = () => {
     if (localStream) {
       const audioTrack = localStream.getAudioTracks()[0];
@@ -342,6 +397,15 @@ export const CallProvider = ({ children }) => {
   const toggleSpeaker = () => {
     setIsSpeakerOn(!isSpeakerOn);
     // In a real implementation, you'd change the audio output device
+  };
+
+  const toggleVideo = () => {
+    if (localStream) {
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+      }
+    }
   };
 
   // Test audio function for debugging
@@ -368,6 +432,7 @@ export const CallProvider = ({ children }) => {
 
   // Socket event handlers
   const handleIncomingCall = (data) => {
+    console.log('Incoming call received:', data);
     setIncomingCall(data);
   };
 
@@ -408,6 +473,19 @@ export const CallProvider = ({ children }) => {
       window.remoteAudio.pause();
       window.remoteAudio.srcObject = null;
       window.remoteAudio = null;
+    }
+    
+    // Clean up video element
+    if (window.remoteVideo) {
+      window.remoteVideo.pause();
+      window.remoteVideo.srcObject = null;
+      window.remoteVideo = null;
+    }
+    
+    // Clear video container
+    const videoContainer = document.getElementById('remote-video-container');
+    if (videoContainer) {
+      videoContainer.innerHTML = '';
     }
     
     // Close peer connection
@@ -533,6 +611,7 @@ export const CallProvider = ({ children }) => {
       endCall,
       toggleMute,
       toggleSpeaker,
+      toggleVideo,
       fetchCallHistory,
       testAudio
     }}>

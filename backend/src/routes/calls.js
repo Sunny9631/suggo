@@ -10,12 +10,17 @@ const router = express.Router();
 router.post('/initiate', auth, async (req, res) => {
   try {
     const { receiverId, type = 'audio' } = req.body;
+    const currentUserId = req.user._id.toString();
+    
+    console.log('Call initiate request:', { receiverId, type, currentUserId });
     
     if (!mongoose.Types.ObjectId.isValid(receiverId)) {
+      console.log('Invalid receiver ID format:', receiverId);
       return res.status(400).json({ message: 'Invalid receiver ID' });
     }
 
-    if (receiverId === req.user._id.toString()) {
+    if (receiverId === currentUserId) {
+      console.log('User trying to call themselves:', receiverId, currentUserId);
       return res.status(400).json({ message: 'Cannot call yourself' });
     }
 

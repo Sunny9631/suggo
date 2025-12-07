@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCall } from '../context/CallContext';
 import { useTheme } from '../context/ThemeContext';
 
 const ActiveCall = () => {
-  const { activeCall, isInCall, isMuted, isSpeakerOn, toggleMute, toggleSpeaker, endCall } = useCall();
+  const { activeCall, isInCall, endCall, toggleMute, toggleSpeaker, toggleVideo, isMuted, isSpeakerOn, localStream, remoteStream } = useCall();
   const { theme } = useTheme();
   const [callDuration, setCallDuration] = useState(0);
+  const localVideoRef = useRef(null);
+  const [isVideoOff, setIsVideoOff] = useState(false);
 
   useEffect(() => {
     let interval;
@@ -17,6 +19,13 @@ const ActiveCall = () => {
     }
     return () => clearInterval(interval);
   }, [isInCall, activeCall]);
+
+  // Handle local video stream
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
 
   if (!isInCall || !activeCall) return null;
 
@@ -40,52 +49,130 @@ const ActiveCall = () => {
     }
   };
 
+  const handleToggleVideo = () => {
+    toggleVideo();
+    setIsVideoOff(!isVideoOff);
+  };
+
   const otherUser = getOtherUser();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex flex-col">
-      {/* Call Header */}
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <div className={`w-24 h-24 rounded-full ${theme.colors.surface} flex items-center justify-center mb-6`}>
-          {otherUser?.avatarUrl ? (
-            <img 
-              src={otherUser.avatarUrl} 
-              alt={otherUser.displayName || otherUser.username}
-              className="w-full h-full rounded-full object-cover"
+      {/* Video Area for Video Calls */}
+      {activeCall?.type === 'video' && (
+        <div className="flex-1 relative">
+          {/* Remote Video */}
+          <div 
+            id="remote-video-container" 
+            className="absolute inset-0 bg-black"
+          >
+            {/* Fallback when no video */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              {otherUser?.avatarUrl ? (
+                <img 
+                  src={otherUser.avatarUrl} 
+                  alt={otherUser.displayName || otherUser.username}
+                  className="w-32 h-32 rounded-full object-cover opacity-50"
+                />
+              ) : (
+                <svg className="w-32 h-32 text-gray-400 opacity-50" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+          </div>
+          
+          {/* Local Video (Picture-in-Picture) */}
+          <div className="absolute top-4 right-4 w-24 h-24 bg-gray-800 rounded-lg overflow-hidden shadow-lg">
+            <video 
+              ref={localVideoRef}
+              muted={true}
+              autoPlay={true}
+              playsInline={true}
+              className="w-full h-full object-cover"
             />
-          ) : (
-            <svg className="w-12 h-12 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-            </svg>
-          )}
+          </div>
+          
+          {/* Call Info Overlay */}
+          <div className="absolute top-4 left-4 text-white">
+            <h2 className="text-xl font-semibold">
+              {otherUser?.displayName || otherUser?.username || 'Unknown'}
+            </h2>
+            <div className="text-sm opacity-75">
+              Video Call • {formatDuration(callDuration)}
+            </div>
+          </div>
         </div>
+      )}
+      
+      {/* Audio Call UI */}
+      {activeCall?.type === 'audio' && (
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <div className={`w-24 h-24 rounded-full ${theme.colors.surface} flex items-center justify-center mb-6`}>
+            {otherUser?.avatarUrl ? (
+              <img 
+                src={otherUser.avatarUrl} 
+                alt={otherUser.displayName || otherUser.username}
+                className="w-full h-full rounded-full object-cover"
+              />
+            ) : (
+              <svg className="w-12 h-12 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              </svg>
+            )}
+          </div>
 
-        <h2 className={`text-2xl font-semibold ${theme.colors.text} mb-2`}>
-          {otherUser?.displayName || otherUser?.username || 'Unknown'}
-        </h2>
+          <h2 className={`text-2xl font-semibold ${theme.colors.text} mb-2`}>
+            {otherUser?.displayName || otherUser?.username || 'Unknown'}
+          </h2>
 
-        <div className={`text-sm ${theme.colors.textSecondary} mb-8`}>
-          {activeCall.type === 'audio' ? 'Audio Call' : 'Video Call'} • {formatDuration(callDuration)}
+          <div className={`text-sm ${theme.colors.textSecondary} mb-8`}>
+            Audio Call • {formatDuration(callDuration)}
+          </div>
+
+          {/* Audio Visualizer */}
+          <div className="flex items-center justify-center gap-1 mb-8">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className={`w-1 bg-blue-500 rounded-full animate-pulse`}
+                style={{
+                  height: `${20 + Math.random() * 20}px`,
+                  animationDelay: `${i * 0.1}s`
+                }}
+              />
+            ))}
+          </div>
         </div>
-
-        {/* Audio Visualizer (Simple animation) */}
-        <div className="flex items-center justify-center gap-1 mb-8">
-          {[...Array(5)].map((_, i) => (
-            <div
-              key={i}
-              className={`w-1 bg-blue-500 rounded-full animate-pulse`}
-              style={{
-                height: `${20 + Math.random() * 20}px`,
-                animationDelay: `${i * 0.1}s`
-              }}
-            />
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Call Controls */}
       <div className={`${theme.colors.surface} border-t ${theme.colors.border} p-6`}>
         <div className="flex justify-center gap-6">
+          {/* Video Toggle - Only show for video calls */}
+          {activeCall?.type === 'video' && (
+            <button
+              onClick={handleToggleVideo}
+              className={`p-4 rounded-full transition-colors ${
+                isVideoOff 
+                  ? 'bg-red-500 text-white' 
+                  : `${theme.colors.buttonSecondary} ${theme.colors.text}`
+              }`}
+              title={isVideoOff ? 'Turn Video On' : 'Turn Video Off'}
+            >
+              {isVideoOff ? (
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+                  <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                </svg>
+              )}
+            </button>
+          )}
+
           <button
             onClick={toggleMute}
             className={`p-4 rounded-full transition-colors ${

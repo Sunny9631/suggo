@@ -132,6 +132,8 @@ io.on("connection", async (socket) => {
     try {
       const { receiverId, callData } = data;
       
+      console.log('call_user event received:', { receiverId, callData, userId });
+      
       // Notify receiver about incoming call
       io.to(receiverId).emit("incoming_call", {
         ...callData,
@@ -139,6 +141,7 @@ io.on("connection", async (socket) => {
       });
       
       console.log(`Call initiated from ${userId} to ${receiverId}`);
+      console.log('Emitted incoming_call to receiver:', receiverId);
     } catch (err) {
       console.error("call_user error:", err.message);
     }
