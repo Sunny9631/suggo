@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from "react";
 import api from "../api/client";
+import { useTheme } from "../context/ThemeContext";
 
 const MessageList = ({ messages, currentUserId }) => {
+  const { theme } = useTheme();
   const bottomRef = useRef(null);
   const markedMessages = useRef(new Set());
   const pollingInterval = useRef(null);
@@ -102,8 +104,8 @@ const MessageList = ({ messages, currentUserId }) => {
             key={m._id}
             className={`max-w-xs md:max-w-md rounded px-3 py-2 text-sm ${
               isMine
-                ? "ml-auto bg-indigo-600 text-white"
-                : "mr-auto bg-slate-700 text-slate-50"
+                ? `ml-auto ${theme.colors.messageSent} text-white`
+                : `mr-auto ${theme.colors.messageReceived} ${theme.colors.text}`
             }`}
           >
             {m.text && <div>{m.text}</div>}

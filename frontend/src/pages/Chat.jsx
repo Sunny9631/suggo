@@ -8,9 +8,17 @@ import MessageList from "../components/MessageList";
 import MessageInput from "../components/MessageInput";
 import FriendsList from "../components/FriendRequests";
 import FriendRequestsList from "../components/FriendRequestsList";
+import ThemeSelector from "../components/ThemeSelector";
+import IncomingCall from "../components/IncomingCall";
+import ActiveCall from "../components/ActiveCall";
+import CallButton from "../components/CallButton";
+import { useTheme } from "../context/ThemeContext";
+import { useCall } from "../context/CallContext";
 
 const Chat = () => {
   const { user, logout } = useAuth();
+  const { theme } = useTheme();
+  const { initiateCall } = useCall();
   const socketRef = useSocket(true);
 
   const [conversations, setConversations] = useState([]);
@@ -283,11 +291,20 @@ const Chat = () => {
       setSearchResults([]);
       setSidebarOpen(false); // Close sidebar on mobile after sending request
     } catch (err) {
-      console.error("Send friend request error:", err);
-      console.error("Error response:", err.response);
-      alert(`Failed to send friend request: ${err.response?.data?.error || err.message}`);
+      console.error("Friend request sended:", err);
+      console.error("Done:", err.response);
+      alert(`Friend request sended: ${err.response?.data?.error || err.message}`);
     } finally {
       setSendingRequest(null);
+    }
+  };
+
+  const startCall = async (userId) => {
+    try {
+      await initiateCall(userId, 'audio');
+    } catch (error) {
+      console.error('Failed to start call:', error);
+      alert('Failed to start call. Please try again.');
     }
   };
 
@@ -297,15 +314,18 @@ const Chat = () => {
     [...typingUserIds].some((id) => id !== user._id);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900">
+    <div className={`min-h-screen ${theme.colors.background} ${theme.colors.text} flex flex-col`}>
+      <IncomingCall />
+      <ActiveCall />
+      <header className={`sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b ${theme.colors.border} ${theme.colors.surface}`}>
         <div className="flex items-center gap-2">
           <span className="font-semibold">SUGGO</span>
-          <span className="text-xs text-slate-400">
+          <span className={`text-xs ${theme.colors.textSecondary}`}>
             {user.displayName || user.username}
           </span>
         </div>
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center gap-3">
+          <ThemeSelector />
           <Link to="/profile" className="text-indigo-300">
             Profile
           </Link>
@@ -317,7 +337,6 @@ const Chat = () => {
           </button>
         </div>
       </header>
-
       <div className="flex flex-1 min-h-0">
         {/* Mobile Sidebar Overlay */}
         {sidebarOpen && (
@@ -492,7 +511,22 @@ const Chat = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                 </button>
-                <button
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const otherUser = activeConvo.participants.find(p => !p.isSelf);
+                      if (otherUser) {
+                        startCall(otherUser._id);
+                      }
+                    }}
+                    className={`p-2 rounded ${theme.colors.surfaceHover}`}
+                    title="Start Audio Call"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                    </svg>
+                  </button>
+                  <button
                   onClick={() => {
                     const otherUser = activeConvo.participants.find(p => !p.isSelf);
                     if (otherUser) {
@@ -515,11 +549,27 @@ const Chat = () => {
                     {activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}
                   </span>
                 </button>
+                </div>
               </div>
               
               {/* Desktop Chat Header */}
               <div className="hidden md:flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-900">
-                <button
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const otherUser = activeConvo.participants.find(p => !p.isSelf);
+                      if (otherUser) {
+                        startCall(otherUser._id);
+                      }
+                    }}
+                    className={`p-2 rounded ${theme.colors.surfaceHover}`}
+                    title="Start Audio Call"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                    </svg>
+                  </button>
+                  <button
                   onClick={() => {
                     const otherUser = activeConvo.participants.find(p => !p.isSelf);
                     if (otherUser) {
@@ -542,6 +592,7 @@ const Chat = () => {
                     {activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}
                   </span>
                 </button>
+                </div>
               </div>
               
               <div className="flex-1 overflow-y-auto">

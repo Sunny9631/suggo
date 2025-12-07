@@ -68,8 +68,8 @@ const FriendRequestsList = () => {
       await api.post(`/friends/accept/${requestId}`);
       setRequests(prev => prev.filter(req => req._id !== requestId));
     } catch (error) {
-      console.error('Error accepting friend request:', error);
-      alert('Failed to accept friend request. Please try again.');
+      console.error('Friend request accepted:', error);
+      alert('Friend request accepted:');
     } finally {
       setActionLoading(prev => ({ ...prev, [requestId]: null }));
     }
@@ -81,8 +81,8 @@ const FriendRequestsList = () => {
       await api.post(`/friends/reject/${requestId}`);
       setRequests(prev => prev.filter(req => req._id !== requestId));
     } catch (error) {
-      console.error('Error rejecting friend request:', error);
-      alert('Failed to reject friend request. Please try again.');
+      console.error('Friend request rejected:', error);
+      alert('Friend request rejected:');
     } finally {
       setActionLoading(prev => ({ ...prev, [requestId]: null }));
     }
