@@ -4,6 +4,7 @@ import { useAuth } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import UserProfile from "./pages/UserProfile";
 import Chat from "./pages/Chat";
 
 const App = () => {
@@ -27,6 +28,10 @@ const App = () => {
       <Route
         path="/profile"
         element={user ? <Profile /> : <Navigate to="/login" />}
+      />
+      <Route
+        path="/profile/:userId"
+        element={user ? <UserProfile /> : <Navigate to="/login" />}
       />
       <Route
         path="/chat"

@@ -79,6 +79,9 @@ io.on("connection", async (socket) => {
   const userId = socket.userId;
   onlineUsers.set(userId, socket.id);
 
+  // Join user to their own room for direct messages
+  socket.join(userId);
+
   await User.findByIdAndUpdate(userId, {
     online: true,
     lastSeenAt: new Date()

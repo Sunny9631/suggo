@@ -7,6 +7,7 @@ const Register = () => {
   const [form, setForm] = useState({
     username: "",
     email: "",
+    mobile: "",
     displayName: "",
     password: ""
   });
@@ -43,6 +44,13 @@ const Register = () => {
             className="w-full px-3 py-2 rounded bg-slate-700 outline-none"
             placeholder="Email"
             value={form.email}
+            onChange={onChange}
+          />
+          <input
+            name="mobile"
+            className="w-full px-3 py-2 rounded bg-slate-700 outline-none"
+            placeholder="Mobile number (optional)"
+            value={form.mobile}
             onChange={onChange}
           />
           <input

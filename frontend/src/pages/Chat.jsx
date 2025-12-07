@@ -115,16 +115,45 @@ const Chat = () => {
       );
     };
 
+    const handleMessageSeen = (data) => {
+      console.log("Received message_seen event:", data);
+      // Update message seen status in real-time
+      setMessages(prev => prev.map(msg => 
+        msg._id === data.messageId 
+          ? { ...msg, seen: true, seenAt: data.seenAt }
+          : msg
+      ));
+    };
+
     socket.on("new_message", handleNewMessage);
     socket.on("typing", handleTyping);
     socket.on("presence_update", handlePresenceUpdate);
+    socket.on("message_seen", handleMessageSeen);
 
     return () => {
       socket.off("new_message", handleNewMessage);
       socket.off("typing", handleTyping);
       socket.off("presence_update", handlePresenceUpdate);
+      socket.off("message_seen", handleMessageSeen);
     };
   }, [activeConvo?._id, socketRef.current]);
+
+  // Handle message seen updates from polling
+  useEffect(() => {
+    const handleMessageSeenUpdate = (event) => {
+      const { messageId, seen } = event.detail;
+      setMessages(prev => prev.map(msg => 
+        msg._id === messageId 
+          ? { ...msg, seen, seenAt: seen ? new Date() : undefined }
+          : msg
+      ));
+    };
+
+    window.addEventListener('messageSeenUpdate', handleMessageSeenUpdate);
+    return () => {
+      window.removeEventListener('messageSeenUpdate', handleMessageSeenUpdate);
+    };
+  }, []);
 
   const handleSend = async ({ text, file }) => {
     if (!activeConvo) return;
@@ -269,7 +298,7 @@ const Chat = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900">
         <div className="flex items-center gap-2">
           <span className="font-semibold">SUGGO</span>
           <span className="text-xs text-slate-400">
@@ -454,7 +483,7 @@ const Chat = () => {
           {activeConvo ? (
             <>
               {/* Mobile Chat Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 md:hidden">
+              <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-900 md:hidden">
                 <button
                   onClick={() => setSidebarOpen(true)}
                   className="p-2 rounded hover:bg-slate-800"
@@ -463,7 +492,15 @@ const Chat = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                 </button>
-                <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const otherUser = activeConvo.participants.find(p => !p.isSelf);
+                    if (otherUser) {
+                      window.open(`/profile/${otherUser._id}`, '_blank');
+                    }
+                  }}
+                  className="flex items-center gap-2 hover:bg-slate-800 rounded px-2 py-1 transition-colors"
+                >
                   <div className="relative">
                     <img
                       src={activeConvo.participants.find(p => !p.isSelf)?.avatarUrl || `https://ui-avatars.com/api/?name=${activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}&background=6366f1&color=fff`}
@@ -477,21 +514,53 @@ const Chat = () => {
                   <span className="font-medium">
                     {activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}
                   </span>
-                </div>
+                </button>
               </div>
               
-              <MessageList messages={messages} currentUserId={user._id} />
-              {typingActive && (
-                <div className="px-3 pb-1 text-xs text-slate-400">
-                  Typing...
-                </div>
-              )}
-              <MessageInput
-                onSend={handleSend}
-                uploading={uploading}
-                uploadProgress={uploadProgress}
-                onTyping={handleTyping}
-              />
+              {/* Desktop Chat Header */}
+              <div className="hidden md:flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-900">
+                <button
+                  onClick={() => {
+                    const otherUser = activeConvo.participants.find(p => !p.isSelf);
+                    if (otherUser) {
+                      window.open(`/profile/${otherUser._id}`, '_blank');
+                    }
+                  }}
+                  className="flex items-center gap-2 hover:bg-slate-800 rounded px-2 py-1 transition-colors"
+                >
+                  <div className="relative">
+                    <img
+                      src={activeConvo.participants.find(p => !p.isSelf)?.avatarUrl || `https://ui-avatars.com/api/?name=${activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}&background=6366f1&color=fff`}
+                      alt={activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                    {activeConvo.participants.find(p => !p.isSelf)?.online && (
+                      <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border border-slate-800"></div>
+                    )}
+                  </div>
+                  <span className="font-medium">
+                    {activeConvo.participants.find(p => !p.isSelf)?.displayName || activeConvo.participants.find(p => !p.isSelf)?.username}
+                  </span>
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto">
+                <MessageList messages={messages} currentUserId={user._id} />
+                {typingActive && (
+                  <div className="px-3 pb-1 text-xs text-slate-400">
+                    Typing...
+                  </div>
+                )}
+              </div>
+              
+              <div className="sticky bottom-0 bg-slate-900 border-t border-slate-800">
+                <MessageInput
+                  onSend={handleSend}
+                  uploading={uploading}
+                  uploadProgress={uploadProgress}
+                  onTyping={handleTyping}
+                />
+              </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-sm text-slate-400">

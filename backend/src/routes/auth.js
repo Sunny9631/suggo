@@ -20,7 +20,7 @@ function createToken(userId) {
 // REGISTER
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password, displayName } = req.body;
+    const { username, email, password, displayName, mobile } = req.body;
 
     // Input validation
     if (!username || !email || !password) {
@@ -38,6 +38,11 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
+    // Mobile validation (optional)
+    if (mobile && !/^\d{10,15}$/.test(mobile)) {
+      return res.status(400).json({ message: "Mobile number must be 10-15 digits" });
+    }
+
     // Password validation: minimum 6 characters
     if (password.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters long" });
@@ -49,13 +54,19 @@ router.post("/register", async (req, res) => {
     }
 
     const existing = await User.findOne({
-      $or: [{ email }, { username }],
+      $or: [{ email }, { username }, ...(mobile ? [{ mobile }] : [])],
     });
 
     if (existing) {
-      return res
-        .status(400)
-        .json({ message: "User with this email or username already exists" });
+      if (existing.email === email) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+      if (existing.username === username) {
+        return res.status(400).json({ message: "User with this username already exists" });
+      }
+      if (mobile && existing.mobile === mobile) {
+        return res.status(400).json({ message: "User with this mobile number already exists" });
+      }
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -63,6 +74,7 @@ router.post("/register", async (req, res) => {
     const user = await User.create({
       username: username.trim(),
       email: email.trim().toLowerCase(),
+      mobile: mobile ? mobile.trim() : undefined,
       passwordHash,
       displayName: displayName ? displayName.trim() : username,
     });
@@ -75,6 +87,7 @@ router.post("/register", async (req, res) => {
         _id: user._id,
         username: user.username,
         email: user.email,
+        mobile: user.mobile,
         displayName: user.displayName,
         bio: user.bio,
         avatarUrl: user.avatarUrl,
@@ -89,18 +102,29 @@ router.post("/register", async (req, res) => {
 // LOGIN
 router.post("/login", async (req, res) => {
   try {
-    const { emailOrUsername, password } = req.body;
+    const { emailOrMobile, password } = req.body;
 
-    if (!emailOrUsername || !password) {
-      return res.status(400).json({ message: "emailOrUsername and password are required" });
+    if (!emailOrMobile || !password) {
+      return res.status(400).json({ message: "email/mobile and password are required" });
     }
 
     // Input sanitization
-    const sanitizedInput = emailOrUsername.trim();
+    const sanitizedInput = emailOrMobile.trim();
 
-    const user = await User.findOne({
-      $or: [{ email: sanitizedInput.toLowerCase() }, { username: sanitizedInput }],
-    });
+    // Check if input is email or mobile number
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitizedInput);
+    const isMobile = /^\d{10,15}$/.test(sanitizedInput);
+
+    let query;
+    if (isEmail) {
+      query = { email: sanitizedInput.toLowerCase() };
+    } else if (isMobile) {
+      query = { mobile: sanitizedInput };
+    } else {
+      query = { username: sanitizedInput };
+    }
+
+    const user = await User.findOne(query);
 
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
@@ -119,6 +143,7 @@ router.post("/login", async (req, res) => {
         _id: user._id,
         username: user.username,
         email: user.email,
+        mobile: user.mobile,
         displayName: user.displayName,
         bio: user.bio,
         avatarUrl: user.avatarUrl,

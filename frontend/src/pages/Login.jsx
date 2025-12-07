@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 
 const Login = () => {
   const { login } = useAuth();
-  const [emailOrUsername, setEmailOrUsername] = useState("");
+  const [emailOrMobile, setEmailOrMobile] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
@@ -12,7 +12,7 @@ const Login = () => {
     e.preventDefault();
     setError("");
     try {
-      await login(emailOrUsername, password);
+      await login(emailOrMobile, password);
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
     }
@@ -26,9 +26,9 @@ const Login = () => {
         <form onSubmit={onSubmit} className="space-y-3">
           <input
             className="w-full px-3 py-2 rounded bg-slate-700 outline-none"
-            placeholder="Email or Username"
-            value={emailOrUsername}
-            onChange={(e) => setEmailOrUsername(e.target.value)}
+            placeholder="Email, Mobile, or Username"
+            value={emailOrMobile}
+            onChange={(e) => setEmailOrMobile(e.target.value)}
           />
           <input
             type="password"
