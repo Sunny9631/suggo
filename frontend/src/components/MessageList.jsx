@@ -40,6 +40,11 @@ const MessageList = ({ messages, currentUserId }) => {
     }
 
     pollingInterval.current = setInterval(async () => {
+      // Only poll if we have messages
+      if (!messages || messages.length === 0) {
+        return;
+      }
+      
       const sentMessages = messages.filter(
         m => (m.senderId === currentUserId || m.senderId?._id === currentUserId) && !m.seen
       );
@@ -48,6 +53,12 @@ const MessageList = ({ messages, currentUserId }) => {
         try {
           // Check each sent message if it's been seen
           for (const message of sentMessages) {
+            // Validate message ID before making request
+            if (!message._id || message._id.startsWith('tmp-')) {
+              console.log('Skipping invalid message ID:', message._id);
+              continue;
+            }
+            
             const response = await api.get(`/messages/${message._id}`);
             if (response.data.seen !== message.seen) {
               // Trigger a re-render by updating the message

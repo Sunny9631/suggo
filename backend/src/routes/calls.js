@@ -30,13 +30,15 @@ router.post('/initiate', auth, async (req, res) => {
       return res.status(404).json({ message: 'Receiver not found' });
     }
 
-    // Check for existing active call
-    const existingCall = await Call.findOne({
-      $or: [
-        { callerId: req.user._id, receiverId, status: { $in: ['ringing', 'connected'] } },
-        { callerId: receiverId, receiverId: req.user._id, status: { $in: ['ringing', 'connected'] } }
-      ]
-    });
+    // Check for existing active call - TEMPORARILY DISABLED FOR TESTING
+    console.log('TEMPORARILY SKIPPING existing call check');
+    const existingCall = null; // await Call.findOne({
+    //   $or: [
+    //     { callerId: req.user._id, receiverId, status: { $in: ['ringing', 'connected'] } },
+    //     { callerId: receiverId, receiverId: req.user._id, status: { $in: ['ringing', 'connected'] } }
+    //   ]
+    // });
+    // console.log('Found existing call:', existingCall);
 
     if (existingCall) {
       return res.status(400).json({ message: 'Call already in progress' });

@@ -78,9 +78,7 @@ const Chat = () => {
       }))
     }));
     setConversations(withSelfFlag);
-    if (!activeConvo && withSelfFlag[0]) {
-      setActiveConvo(withSelfFlag[0]);
-    }
+    // Remove auto-selection - let user manually select a conversation
   };
 
   const loadMessages = async (conversationId, cursor) => {
