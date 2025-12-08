@@ -68,22 +68,43 @@ router.post('/initiate', auth, async (req, res) => {
 router.post('/:callId/answer', auth, async (req, res) => {
   try {
     const { callId } = req.params;
+    const currentUserId = req.user._id;
+    
+    console.log('Answer call request:', { callId, currentUserId });
     
     if (!mongoose.Types.ObjectId.isValid(callId)) {
+      console.log('Invalid call ID format:', callId);
       return res.status(400).json({ message: 'Invalid call ID' });
     }
 
     const call = await Call.findById(callId);
     if (!call) {
+      console.log('Call not found:', callId);
       return res.status(404).json({ message: 'Call not found' });
     }
 
+    console.log('Call found:', {
+      callId: call._id,
+      status: call.status,
+      callerId: call.callerId,
+      receiverId: call.receiverId,
+      receiverIdType: typeof call.receiverId,
+      callerIdType: typeof call.callerId
+    });
+
     // Verify user is the receiver
-    if (call.receiverId.toString() !== req.user._id.toString()) {
+    const receiverIdStr = call.receiverId.toString();
+    const currentUserIdStr = currentUserId.toString();
+    
+    console.log('Comparing IDs:', { receiverIdStr, currentUserIdStr });
+    
+    if (receiverIdStr !== currentUserIdStr) {
+      console.log('User not authorized to answer this call');
       return res.status(403).json({ message: 'Not authorized' });
     }
 
     if (call.status !== 'ringing') {
+      console.log('Call status not ringing:', call.status);
       return res.status(400).json({ message: 'Call is no longer ringing' });
     }
 
@@ -93,6 +114,7 @@ router.post('/:callId/answer', auth, async (req, res) => {
 
     await call.populate('callerId', 'username displayName avatarUrl');
 
+    console.log('Call answered successfully');
     res.json(call);
   } catch (err) {
     console.error('Answer call error:', err.message);

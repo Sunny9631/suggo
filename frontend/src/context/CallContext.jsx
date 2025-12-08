@@ -120,8 +120,10 @@ export const CallProvider = ({ children }) => {
 
   const answerCall = async (callId) => {
     try {
+      console.log('Answering call with ID:', callId);
       const response = await api.post(`/calls/${callId}/answer`);
       const call = response.data;
+      console.log('Call answered successfully:', call);
       
       // Receiver also needs to setup WebRTC to send their stream
       await setupWebRTC(call.roomId, call.callerId._id, call.type);
@@ -144,6 +146,9 @@ export const CallProvider = ({ children }) => {
       return call;
     } catch (error) {
       console.error('Failed to answer call:', error);
+      console.error('Error response data:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      console.error('Error response message:', error.response?.data?.message);
       throw error;
     }
   };
@@ -174,16 +179,32 @@ export const CallProvider = ({ children }) => {
         console.log('Ending call, activeCall:', activeCall);
         console.log('Current user ID:', user._id);
         
-        // Get the other user's ID - current user is either receiver or caller
+        // Get the other user's ID - handle different data structures
         let otherUserId;
+        
         if (activeCall.callerId && activeCall.receiverId) {
-          if (typeof activeCall.callerId === 'object') {
+          // Handle object format
+          if (typeof activeCall.callerId === 'object' && activeCall.callerId._id) {
             otherUserId = activeCall.callerId._id === user._id 
-              ? activeCall.receiverId._id 
+              ? (activeCall.receiverId._id || activeCall.receiverId)
               : activeCall.callerId._id;
-          } else {
+          }
+          // Handle string format
+          else if (typeof activeCall.callerId === 'string') {
             otherUserId = activeCall.callerId === user._id 
               ? activeCall.receiverId 
+              : activeCall.callerId;
+          }
+          // Handle mixed format (caller is object, receiver is string)
+          else if (typeof activeCall.callerId === 'object' && typeof activeCall.receiverId === 'string') {
+            otherUserId = activeCall.callerId._id === user._id 
+              ? activeCall.receiverId
+              : activeCall.callerId._id;
+          }
+          // Handle mixed format (caller is string, receiver is object)
+          else if (typeof activeCall.callerId === 'string' && typeof activeCall.receiverId === 'object') {
+            otherUserId = activeCall.callerId === user._id 
+              ? activeCall.receiverId._id
               : activeCall.callerId;
           }
         }
@@ -197,6 +218,12 @@ export const CallProvider = ({ children }) => {
           });
         } else {
           console.error('Could not determine other user ID for end call');
+          console.error('activeCall structure:', {
+            callerId: activeCall.callerId,
+            receiverId: activeCall.receiverId,
+            callerIdType: typeof activeCall.callerId,
+            receiverIdType: typeof activeCall.receiverId
+          });
         }
       }
 
@@ -260,11 +287,17 @@ export const CallProvider = ({ children }) => {
 
       // Get user media based on call type
       console.log('Getting user media for:', callType);
+      console.log('activeCall.type:', activeCall?.type);
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: true, 
         video: callType === 'video'
       });
       console.log('Got local stream:', stream);
+      console.log('Local stream tracks:', stream.getTracks());
+      console.log('Video tracks:', stream.getVideoTracks());
+      console.log('Audio tracks:', stream.getAudioTracks());
+      console.log('Video track enabled:', stream.getVideoTracks()[0]?.enabled);
+      console.log('Video track state:', stream.getVideoTracks()[0]?.readyState);
       setLocalStream(stream);
 
       // Join call room
@@ -287,6 +320,9 @@ export const CallProvider = ({ children }) => {
       
       // Add local stream to peer connection
       stream.getTracks().forEach(track => {
+        console.log('Adding track to peer connection:', track);
+        console.log('Track kind:', track.kind);
+        console.log('Track enabled:', track.enabled);
         peerConnection.addTrack(track, stream);
       });
       console.log('Local tracks added to peer connection');
@@ -305,11 +341,19 @@ export const CallProvider = ({ children }) => {
       // Handle remote stream
       peerConnection.ontrack = (event) => {
         console.log('Received remote stream in setupWebRTC');
+        console.log('Remote stream:', event.streams[0]);
+        console.log('Remote stream tracks:', event.streams[0].getTracks());
+        console.log('Remote video tracks:', event.streams[0].getVideoTracks());
+        console.log('Remote audio tracks:', event.streams[0].getAudioTracks());
+        console.log('Remote video track enabled:', event.streams[0].getVideoTracks()[0]?.enabled);
+        console.log('Remote video track state:', event.streams[0].getVideoTracks()[0]?.readyState);
+        
         setRemoteStream(event.streams[0]);
         createAudioElement(event.streams[0]);
         
         // Create video element if this is a video call
         if (callType === 'video') {
+          console.log('Creating video element for remote stream');
           createVideoElement(event.streams[0]);
         }
       };
@@ -383,6 +427,8 @@ export const CallProvider = ({ children }) => {
     console.log('createVideoElement called, activeCall:', activeCall);
     console.log('activeCall.type:', activeCall?.type);
     console.log('isInCall:', isInCall);
+    console.log('Stream being passed to video element:', stream);
+    console.log('Stream video tracks:', stream.getVideoTracks());
     
     // Clean up existing video element
     if (window.remoteVideo) {
@@ -394,6 +440,7 @@ export const CallProvider = ({ children }) => {
     }
 
     const video = document.createElement('video');
+    console.log('Video element created:', video);
     video.srcObject = stream;
     video.autoplay = true;
     video.muted = false; // Don't mute remote video
@@ -402,17 +449,28 @@ export const CallProvider = ({ children }) => {
     video.style.height = '100%';
     video.style.objectFit = 'cover';
     
+    console.log('Video element properties set:', {
+      srcObject: video.srcObject,
+      autoplay: video.autoplay,
+      muted: video.muted,
+      playsInline: video.playsInline
+    });
+    
     // Store the video element globally for later attachment
     window.pendingVideoElement = video;
     
     // Try multiple times with increasing delays to find the container
     const tryAttachVideo = (attempt = 1) => {
+      console.log(`Trying to attach video, attempt ${attempt}/5`);
       const container = document.getElementById('remote-video-container');
       if (container) {
+        console.log('Found video container:', container);
         // Clear any existing content
         container.innerHTML = '';
         container.appendChild(video);
         console.log('Remote video element attached to container');
+        console.log('Video element parent:', video.parentNode);
+        console.log('Video element playing:', !video.paused);
         window.pendingVideoElement = null; // Clear the pending element
       } else {
         console.log(`Remote video container not found, attempt ${attempt}/5`);
@@ -550,19 +608,26 @@ export const CallProvider = ({ children }) => {
     try {
       console.log('Received WebRTC offer:', data);
       
-      // Use existing peer connection or create new one if none exists
-      let peerConnection = window.currentPeerConnection;
-      if (!peerConnection) {
-        console.log('No existing peer connection, creating new one');
-        const configuration = {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
-          ]
-        };
-        peerConnection = new RTCPeerConnection(configuration);
-        window.currentPeerConnection = peerConnection;
+      // Always create a fresh peer connection for the receiver
+      // Close any existing connection first
+      if (window.currentPeerConnection) {
+        console.log('Closing existing peer connection');
+        window.currentPeerConnection.close();
+        window.currentPeerConnection = null;
       }
+      
+      // Create new peer connection
+      console.log('Creating new peer connection for receiver');
+      const configuration = {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      };
+      const peerConnection = new RTCPeerConnection(configuration);
+      window.currentPeerConnection = peerConnection;
+      
+      console.log('Peer connection created, signaling state:', peerConnection.signalingState);
       
       // Handle ICE candidates
       peerConnection.onicecandidate = (event) => {
@@ -577,54 +642,65 @@ export const CallProvider = ({ children }) => {
       // Handle remote stream
       peerConnection.ontrack = (event) => {
         console.log('Received remote stream in WebRTC offer handler');
+        console.log('Remote stream tracks:', event.streams[0].getTracks());
+        console.log('Remote video tracks:', event.streams[0].getVideoTracks());
+        
         setRemoteStream(event.streams[0]);
         createAudioElement(event.streams[0]);
         
         // Create video element if this is a video call
-        if (activeCall && activeCall.type === 'video') {
+        const callType = activeCall?.type || incomingCall?.type || 'video';
+        if (callType === 'video') {
+          console.log('Creating video element for remote stream, call type:', callType);
           createVideoElement(event.streams[0]);
+        } else {
+          console.log('Not creating video element - call type:', callType);
         }
       };
 
-      // Add local stream tracks to peer connection
-      if (localStream) {
-        console.log('Adding local stream tracks to peer connection');
-        localStream.getTracks().forEach(track => {
-          peerConnection.addTrack(track, localStream);
-        });
-      } else {
-        console.log('No local stream available, getting new media');
-        // Fallback: get user media if no local stream exists
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          audio: true, 
-          video: activeCall?.type === 'video'
-        });
-        setLocalStream(stream);
-        stream.getTracks().forEach(track => {
-          peerConnection.addTrack(track, stream);
-        });
-      }
+      // Get local media for receiver
+      const callType = activeCall?.type || incomingCall?.type || 'video';
+      console.log('Getting local media for receiver, call type:', callType);
+      console.log('activeCall.type:', activeCall?.type);
+      console.log('incomingCall.type:', incomingCall?.type);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: true, 
+        video: callType === 'video'
+      });
+      console.log('Got local stream for receiver:', stream);
+      console.log('Receiver local video tracks:', stream.getVideoTracks());
+      setLocalStream(stream);
+      
+      // Add local tracks to peer connection
+      stream.getTracks().forEach(track => {
+        console.log('Adding track to receiver peer connection:', track.kind);
+        peerConnection.addTrack(track, stream);
+      });
+      console.log('Local tracks added to receiver peer connection');
 
-      // Store peer connection
-      window.currentPeerConnection = peerConnection;
-
-      // Set remote description first
-      await peerConnection.setRemoteDescription(data.offer);
-
-      // Create and send answer
+      // Set remote description (caller's offer)
+      console.log('Setting remote description from caller');
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+      console.log('Remote description set successfully');
+      
+      // Create answer
+      console.log('Creating WebRTC answer');
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
-
-      // Send answer back
-      socket.emit('webrtc_answer', {
-        targetUserId: data.callerId,
-        answer: answer
-      });
-
-      console.log('WebRTC offer handled and answer sent');
-
+      console.log('WebRTC answer created and set as local description');
+      
+      // Send answer back to caller
+      if (socket) {
+        socket.emit('webrtc_answer', {
+          targetUserId: data.callerId,
+          answer: answer
+        });
+        console.log('WebRTC answer sent to caller');
+      }
+      
     } catch (error) {
       console.error('Error handling WebRTC offer:', error);
+      console.error('Error details:', error.message);
     }
   };
 
@@ -652,7 +728,18 @@ export const CallProvider = ({ children }) => {
   const handleWebRTCIceCandidate = async (data) => {
     try {
       if (window.currentPeerConnection) {
-        await window.currentPeerConnection.addIceCandidate(data.candidate);
+        // Only add ICE candidate if remote description is set
+        if (window.currentPeerConnection.remoteDescription) {
+          await window.currentPeerConnection.addIceCandidate(data.candidate);
+          console.log('ICE candidate added successfully');
+        } else {
+          console.log('ICE candidate received but remote description not set yet, queuing...');
+          // Store candidate for later if needed
+          if (!window.pendingIceCandidates) {
+            window.pendingIceCandidates = [];
+          }
+          window.pendingIceCandidates.push(data.candidate);
+        }
       }
     } catch (error) {
       console.error('Error handling ICE candidate:', error);

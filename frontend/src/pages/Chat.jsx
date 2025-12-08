@@ -394,7 +394,7 @@ const Chat = () => {
             </div>
             
             {/* Tabs */}
-            <div className="flex border-b border-slate-700">
+            <div className="sticky top-0 z-10 flex border-b border-slate-700 bg-slate-800">
               <button
                 onClick={() => setActiveTab("chats")}
                 className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
@@ -429,7 +429,7 @@ const Chat = () => {
             
             {/* Search Bar - only show on chats tab */}
             {activeTab === "chats" && (
-              <div className="p-3 border-b border-slate-700">
+              <div className="sticky top-12 z-10 p-3 border-b border-slate-700 bg-slate-800">
                 <div className="relative search-container">
                   <input
                     type="text"
@@ -531,7 +531,7 @@ const Chat = () => {
           {activeConvo ? (
             <>
               {/* Mobile Chat Header */}
-              <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-900 md:hidden">
+              <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-900 md:hidden">
                 <button
                   onClick={() => setSidebarOpen(true)}
                   className="p-2 rounded hover:bg-slate-800"
@@ -605,7 +605,7 @@ const Chat = () => {
               </div>
               
               {/* Desktop Chat Header */}
-              <div className="hidden md:flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-900">
+              <div className="sticky top-0 z-20 hidden md:flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-900">
                 <div className="flex items-center gap-2">
                   {/* Call Options Dropdown */}
                   <div className="relative">
@@ -678,7 +678,7 @@ const Chat = () => {
                 )}
               </div>
               
-              <div className="sticky bottom-0 bg-slate-900 border-t border-slate-800">
+              <div className="sticky bottom-0 z-30 bg-slate-900 border-t border-slate-800">
                 <MessageInput
                   onSend={handleSend}
                   uploading={uploading}
